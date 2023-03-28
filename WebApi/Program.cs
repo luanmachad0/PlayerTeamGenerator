@@ -7,47 +7,81 @@ using WebApi.Helpers;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption;
 using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption.ConfigurationModel;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenApi.Models;
+
 _.__();
 
 var builder = WebApplication.CreateBuilder(args);
 
 // add services to DI container
 {
-  builder.WebHost.UseUrls("http://localhost:3000");
-  builder.WebHost.ConfigureLogging((context, logging) =>
-  {
-    var config = context.Configuration.GetSection("Logging");
-    logging.AddConfiguration(config);
-    logging.AddConsole();
-    logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
-    logging.AddFilter("Microsoft.EntityFrameworkCore.Infrastructure", LogLevel.Warning);
-    logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
-  });
+    builder.WebHost.UseUrls("http://localhost:3000");
+    builder.WebHost.ConfigureLogging((context, logging) =>
+    {
+        var config = context.Configuration.GetSection("Logging");
+        logging.AddConfiguration(config);
+        logging.AddConsole();
+        logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+        logging.AddFilter("Microsoft.EntityFrameworkCore.Infrastructure", LogLevel.Warning);
+        logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+    });
 
-  var services = builder.Services;
-  services.AddControllers();
-  services.AddSqlite<DataContext>("DataSource=webApi.db");
+    var services = builder.Services;
+    services.AddControllers();
+    services.AddSqlite<DataContext>("DataSource=webApi.db");
+    services.AddEndpointsApiExplorer();
+    services.AddSwaggerGen(c =>
+    {
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.ApiKey,
+            Description = "Enter the token with the `Bearer:` prefix.",
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+            Scheme = "Bearer"
+        });
 
-  services.AddDataProtection().UseCryptographicAlgorithms(
-      new AuthenticatedEncryptorConfiguration
-      {
-        EncryptionAlgorithm = EncryptionAlgorithm.AES_256_CBC,
-        ValidationAlgorithm = ValidationAlgorithm.HMACSHA256
-      });
+        // Apply the security scheme globally to all operations
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                new string[] {}
+            }
+        });
+    });
+
+    services.AddDataProtection().UseCryptographicAlgorithms(
+        new AuthenticatedEncryptorConfiguration
+        {
+            EncryptionAlgorithm = EncryptionAlgorithm.AES_256_CBC,
+            ValidationAlgorithm = ValidationAlgorithm.HMACSHA256
+        });
 }
 
 var app = builder.Build();
+app.UseSwaggerUI();
 
 // migrate any database changes on startup (includes initial db creation)
 using (var scope = app.Services.CreateScope())
 {
-  var dataContext = scope.ServiceProvider.GetRequiredService<DataContext>();
-  dataContext.Database.EnsureCreated();
+    var dataContext = scope.ServiceProvider.GetRequiredService<DataContext>();
+    dataContext.Database.EnsureCreated();
 }
+
+app.UseSwagger(x => x.SerializeAsV2 = true);
 
 // configure HTTP request pipeline
 {
-  app.MapControllers();
+    app.MapControllers();
 }
 
 app.Run();
