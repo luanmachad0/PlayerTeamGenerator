@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Linq.Expressions;
+using WebApi.Models;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -32,19 +33,30 @@ public class PlayerController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<Player>> PostPlayer([FromBody] Player player)
+    public async Task<ActionResult<Player>> PostPlayer([FromBody] PlayerViewModel playerModel)
     {
-        if (!ValidatePlayerPositionNameHelper.Validate(player.Position))
-            return BadRequest(new ErrorResponse($"Invalid value for position: {player.Position}"));
+        if (!ValidatePlayerPositionNameHelper.Validate(playerModel.Position))
+            return BadRequest(new ErrorResponse($"Invalid value for position: {playerModel.Position}"));
 
-        if (!player.PlayerSkills.Any())
+        if (!playerModel.PlayerSkills.Any())
             return BadRequest(new ErrorResponse("The player needs at least one skill"));
 
-        foreach (var skill in player.PlayerSkills)
+        foreach (var skill in playerModel.PlayerSkills)
         {
             if (!ValidateSkillNameHelper.Validate(skill.Skill))
                 return BadRequest(new ErrorResponse($"Invalid skill name: {skill.Skill}"));
         }
+
+        Player player = new()
+        {
+            Name = playerModel.Name,
+            Position = playerModel.Position,
+            PlayerSkills = playerModel.PlayerSkills.Select(ps => new PlayerSkill
+            {
+                Skill = ps.Skill,
+                Value = ps.Value
+            }).ToList()
+        };
 
         Context.Players.Add(player);
         await Context.SaveChangesAsync();
@@ -52,7 +64,7 @@ public class PlayerController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutPlayer(int id, Player player)
+    public async Task<IActionResult> PutPlayer(int id, PlayerViewModel player)
     {
         var existentPlayer = await Context.Players.Include(p => p.PlayerSkills).FirstOrDefaultAsync(p => p.Id == id);
 
@@ -61,7 +73,11 @@ public class PlayerController : ControllerBase
 
         existentPlayer.Name = player.Name;
         existentPlayer.Position = player.Position;
-        existentPlayer.PlayerSkills = player.PlayerSkills;
+        existentPlayer.PlayerSkills = player.PlayerSkills.Select(ps => new PlayerSkill
+        {
+            Skill = ps.Skill,
+            Value = ps.Value
+        }).ToList();
 
         await Context.SaveChangesAsync();
 
