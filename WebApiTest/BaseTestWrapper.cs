@@ -6,6 +6,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using NUnit.Framework;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -65,7 +66,23 @@ namespace WebApiTest
                 }).ToList()
             };
 
-            dataContext.Players.Add(model);
+            newPlayer ??= playerTwo;
+            Player model2 = new()
+            {
+                Name = newPlayer.Name,
+                Position = newPlayer.Position,
+                PlayerSkills = newPlayer.PlayerSkills.Select(x => new PlayerSkill
+                {
+                    Skill = x.Skill,
+                    Value = x.Value
+                }).ToList()
+            };
+
+            List<Player> players = new List<Player>();
+            players.Add(model);
+            players.Add(model2);
+
+            dataContext.Players.AddRange(players);
             await dataContext.SaveChangesAsync();
         }
 
@@ -77,6 +94,17 @@ namespace WebApiTest
             {
                 new() { Skill = "attack", Value = 60 },
                 new() { Skill = "speed", Value = 80 },
+            }
+        };
+
+        protected PlayerViewModel playerTwo = new()
+        {
+            Name = "player name",
+            Position = "defender",
+            PlayerSkills = new()
+            {
+                new() { Skill = "attack", Value = 60 },
+                new() { Skill = "speed", Value = 50 },
             }
         };
     }

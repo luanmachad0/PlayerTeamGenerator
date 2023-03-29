@@ -76,7 +76,7 @@ namespace WebApi.Controllers
                 }
             }
 
-            return players;
+            return Ok(players);
         }
     }
 }
